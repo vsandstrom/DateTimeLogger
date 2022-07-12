@@ -1,3 +1,4 @@
+
 #[allow(unused_imports)]
 use std::collections::HashMap;
 
@@ -7,11 +8,16 @@ use rusqlite::{Connection, Result};
 
 #[allow(unused_imports)]
 use chrono::prelude::*;
+
 #[allow(unused_imports)]
 use message_io::network::{self, NetEvent, Transport};
 
-
 use clap::Parser;
+
+// TODO: 
+// [  ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
+//         new data input.
+// [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 
 #[derive(Parser, Default, Debug)]
 struct Cli {
@@ -19,17 +25,11 @@ struct Cli {
     #[clap(default_value_t=String::from("Viktor Sandström"))]
     /// Name of user 
     name: String,
-    #[clap(default_value_t=String::from("Hello"))]
+    // #[clap(default_value_t=None)]
     #[clap(short, long)]
     /// Action to take with runtime input
-    action: String,
-    // path: std::path::PathBuf,
+    action: Option<String>,
 }
-
-// TODO: 
-// [  ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
-//         new data input.
-// [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 
 
 fn main() -> Result<()> {
