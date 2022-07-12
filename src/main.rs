@@ -1,7 +1,7 @@
 
 #[allow(unused_imports)]
 use std::collections::HashMap;
-
+use std::time::Duration;
 
 #[allow(unused_imports)]
 use rusqlite::{Connection, Result};
@@ -10,13 +10,16 @@ use rusqlite::{Connection, Result};
 use chrono::prelude::*;
 
 #[allow(unused_imports)]
-use message_io::network::{self, NetEvent, Transport};
+// use message_io::node::{self, NodeEvent};
+// use message_io::network::{NetEvent, Transport};
 
 use clap::Parser;
 
 // TODO: 
-// [  ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
+// [ X ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
 //         new data input.
+// [ X ] -> Make a CLI parser for inputting a custom username under which to store associated data
+//          SQL table
 // [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 
 #[derive(Parser, Default, Debug)]
@@ -29,6 +32,10 @@ struct Cli {
     #[clap(short, long)]
     /// Action to take with runtime input
     action: Option<String>,
+}
+
+enum Signal {
+    Greet,
 }
 
 
@@ -119,8 +126,31 @@ fn main() -> Result<()> {
     // ------------------------------------------
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
     // ------------------------------------------
+    
+    // let (handler, listener) = node::split();
 
-    // TODO
+    // let (server, _) = handler.network().connect(Transport::Ws, "127.0.0.1:3042").unwrap();
+    
+    // println!("{}", server.addr());
+
+    // listener.for_each(move |event| match event {
+    //     NodeEvent::Network(net_event) => match net_event {
+    //         NetEvent::Connected(_endpoint, _ok) => handler.signals().send(Signal::Greet),
+    //         NetEvent::Accepted(_, _) => unreachable!(),
+    //         NetEvent::Message(_endpoint, data) => {
+    //             println!("Recieved: {}", String::from_utf8_lossy(data));
+    //         },
+    //         NetEvent::Disconnected(_disconnected) => (),
+    //     },
+    //     NodeEvent::Signal(signal) => match signal {
+    //         Signal::Greet => {
+    //             handler.network().send(server, "Hello server".as_bytes());
+    //             handler.signals().send_with_timer(Signal::Greet, Duration::from_secs(1));
+    //         }
+    //     }
+    // });
+
+
 
     Ok(())
-}
+    }
