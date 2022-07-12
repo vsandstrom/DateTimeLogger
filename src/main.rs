@@ -15,8 +15,14 @@ use clap::Parser;
 
 #[derive(Parser, Default, Debug)]
 struct Cli {
+    #[clap(short, long)]
     #[clap(default_value_t=String::from("Viktor Sandström"))]
+    /// Name of user 
     name: String,
+    #[clap(default_value_t=String::from("Hello"))]
+    #[clap(short, long)]
+    /// Action to take with runtime input
+    action: String,
     // path: std::path::PathBuf,
 }
 
