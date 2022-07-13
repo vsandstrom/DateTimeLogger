@@ -52,8 +52,23 @@ fn main() -> Result<()> {
     let date: String = dt.format("%Y-%m-%d").to_string();
     let time: String = dt.format("%H:%M:%S").to_string();
 
+    let _message: String = format!("{}, {}", &date, &time);
+
     println!("{}\n{}\n", date, time);
 
+    // ------------------------------------------
+    // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
+    // ------------------------------------------
+   
+    listen("127.0.0.1:3012", |out| {
+        move |msg| {
+            thread::sleep(Duration::from_secs(2));
+            println!("{}", msg);
+            // simple reflecting websocket, needs more advanced handling if it is to get info from
+            // server.
+            out.send(msg)
+        }
+    }).unwrap();
 
     // ------------------------------
     // SQL CONNECTION TO SQL DATABASE
@@ -122,41 +137,7 @@ fn main() -> Result<()> {
     // }
 
     
-    // ------------------------------------------
-    // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
-    // ------------------------------------------
-   
-    #[allow(unused_results)]
-    listen("127.0.0.1:3012", |out| {
-        move |msg| {
-            thread::sleep(Duration::from_secs(2));
-            out.send(msg)
-        }
-    }).unwrap();
     
-    // let (handler, listener) = node::split();
-
-    // let (server, _) = handler.network().connect(Transport::Ws, "127.0.0.1:3042").unwrap();
-    
-    // println!("{}", server.addr());
-
-    // listener.for_each(move |event| match event {
-    //     NodeEvent::Network(net_event) => match net_event {
-    //         NetEvent::Connected(_endpoint, _ok) => handler.signals().send(Signal::Greet),
-    //         NetEvent::Accepted(_, _) => unreachable!(),
-    //         NetEvent::Message(_endpoint, data) => {
-    //             println!("Recieved: {}", String::from_utf8_lossy(data));
-    //         },
-    //         NetEvent::Disconnected(_disconnected) => (),
-    //     },
-    //     NodeEvent::Signal(signal) => match signal {
-    //         Signal::Greet => {
-    //             handler.network().send(server, "Hello server".as_bytes());
-    //             handler.signals().send_with_timer(Signal::Greet, Duration::from_secs(1));
-    //         }
-    //     }
-    // });
-
 
 
     Ok(())
