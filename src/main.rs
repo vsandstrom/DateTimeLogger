@@ -1,19 +1,19 @@
 
 #[allow(unused_imports)]
 use std::collections::HashMap;
-use std::time::Duration;
+// use std::time::Duration;
 
-#[allow(unused_imports)]
 use rusqlite::{Connection, Result};
-
-#[allow(unused_imports)]
 use chrono::prelude::*;
+use std::time::Duration;
+use std::thread;
+use clap::Parser;
+use ws::listen;
 
 #[allow(unused_imports)]
 // use message_io::node::{self, NodeEvent};
 // use message_io::network::{NetEvent, Transport};
 
-use clap::Parser;
 
 // TODO: 
 // [ X ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
@@ -34,10 +34,9 @@ struct Cli {
     action: Option<String>,
 }
 
-enum Signal {
-    Greet,
-}
-
+// enum Signal {
+//     Greet,
+// }
 
 fn main() -> Result<()> {
 
@@ -126,6 +125,14 @@ fn main() -> Result<()> {
     // ------------------------------------------
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
     // ------------------------------------------
+   
+    #[allow(unused_results)]
+    listen("127.0.0.1:3012", |out| {
+        move |msg| {
+            thread::sleep(Duration::from_secs(2));
+            out.send(msg)
+        }
+    }).unwrap();
     
     // let (handler, listener) = node::split();
 
@@ -153,4 +160,4 @@ fn main() -> Result<()> {
 
 
     Ok(())
-    }
+}
