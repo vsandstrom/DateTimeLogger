@@ -1,4 +1,3 @@
-
 #[allow(unused_imports)]
 use std::collections::HashMap;
 // use std::time::Duration;
@@ -6,11 +5,10 @@ use std::collections::HashMap;
 use rusqlite::{Connection, Result};
 use chrono::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use std::thread;
 use clap::Parser;
 #[allow(unused)]
 use ws::{listen, Message};
+
 
 #[allow(unused_imports)]
 // use message_io::node::{self, NodeEvent};
@@ -29,9 +27,9 @@ use ws::{listen, Message};
 #[derive(Parser, Default, Debug)]
 struct Cli {
     #[clap(short, long)]
-    #[clap(default_value_t=String::from("Viktor Sandström"))]
+    // #[clap(default_value_t=String::from("Viktor Sandström"))]
     /// Name of user 
-    name: String,
+    name: Option<String>,
     // #[clap(default_value_t=None)]
     #[clap(short, long)]
     /// Action to take with runtime input
@@ -45,7 +43,23 @@ struct Cli {
 fn main() -> Result<()> {
 
     let args = Cli::parse();
-    println!("{:?}", args);
+
+    let name: String = match args.name {
+        Some(name) => name,
+        None => "".to_string(), // "Viktor Sandström".to_string(),
+    };
+
+    let action: String = match args.action {
+        Some(action) => action,
+        None => Default::default(), 
+    };
+
+    if name.len() != 0 {
+        println!("{:?}", &name);
+        println!("{:?}", &action);
+
+    }
+
 
     let sqlconn = Arc::new(Mutex::new(Connection::open("medicine.db")?));
 
@@ -70,96 +84,102 @@ fn main() -> Result<()> {
     println!("IP: {ip}");
 
     let conn = Connection::open("medicine.db")?;
+
+    // http::Response();
     
-    listen(ip, |out| {
-        // use a new thread here to use conn to sql as Arc::new(Mutex::new);
-        let user: &str = &args.name;
+    if name.len() == 0 {
 
-        // Seems unnecesary to use Arc locks to give access to the connection to the sql. 
-        // how shold this be handled?
-        let _inconn = Arc::clone(&sqlconn);
+        listen(ip, |out| {
+            // use a new thread here to use conn to sql as Arc::new(Mutex::new);
+            let user: &str = &name;
 
-        // let mut test_data = HashMap::new();
-        // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
+            // Seems unnecesary to use Arc locks to give access to the connection to the sql. 
+            // how shold this be handled?
+            let _inconn = Arc::clone(&sqlconn);
 
-        
-        move |msg: Message| {
-            println!("{}", msg);
-            // thread::sleep(Duration::from_secs(2));
-            let dt: DateTime<Local> = Local::now();
-            let date: String = dt.format("%Y-%m-%d").to_string();
-            let time: String = dt.format("%H:%M:%S").to_string();
+            // let mut test_data = HashMap::new();
+            // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
             
-            // rusqlite uses execute to run actual sql queries
-            let conn = Connection::open("medicine.db").unwrap();
+            move |msg: Message| {
+                println!("{}", msg);
+                // thread::sleep(Duration::from_secs(2));
+                let dt: DateTime<Local> = Local::now();
+                let date: String = dt.format("%Y-%m-%d").to_string();
+                let time: String = dt.format("%H:%M:%S").to_string();
 
-            //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
-            //--- new user
-            // let mut stmt = conn.prepare("select user from users where user = :user").unwrap();
-            // let res = stmt.query([msg.to_string()]).unwrap();
+                // rusqlite uses execute to run actual sql queries
+                let conn = Connection::open("medicine.db").unwrap();
 
-            conn.execute(
-                "create table if not exists users (
-                    id integer primary key,
-                    name text not null
-                )",
-                [],
-            ).unwrap();
+                //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
+                //--- new user
+                // let mut stmt = conn.prepare("select user from users where user = :user").unwrap();
+                // let res = stmt.query([msg.to_string()]).unwrap();
+                
+
+                conn.execute(
+                    "create table if not exists users (
+                        id integer primary key,
+                        name text not null
+                    )",
+                    [],
+                ).unwrap();
 
 
-            conn.execute(
-                "create table if not exists data (
-                    id integer primary key,
-                    date text not null,
-                    time text not null,
-                    user_id integer not null references users(id)
-                )",
-                [],
-            ).unwrap();
+                conn.execute(
+                    "create table if not exists data (
+                        id integer primary key,
+                        date text not null,
+                        time text not null,
+                        user_id integer not null references users(id)
+                    )",
+                    [],
+                ).unwrap();
 
+                conn.execute(
+                    "INSERT INTO users (name) values (?1)",
+                    [msg.to_string()]
+                ).unwrap();
+
+                let last_id: String = conn.last_insert_rowid().to_string();
+
+                conn.execute(
+                    "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
+                    [&date, &time, &last_id]
+                ).unwrap();
+
+                let message: String = format!("{}\n{}, {}", msg.to_string(), &date, &time);
+
+                out.send(message)
+            }
+        }).unwrap();
+
+    } else {
+        #[allow(unreachable_code)]
+        let mut test_data = HashMap::new();
+
+        // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
+        test_data.insert(name, vec!(date, time));
+
+        for (users, data) in &test_data {
             conn.execute(
                 "INSERT INTO users (name) values (?1)",
-                [msg.to_string()]
-            ).unwrap();
+                &[&users.to_string()],
+            )?;
 
             let last_id: String = conn.last_insert_rowid().to_string();
 
             conn.execute(
                 "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
-                [&date, &time, &last_id]
-            ).unwrap();
+                &[&data[0].to_string(), &data[1].to_string(), &last_id],
+            )?;
 
-            let message: String = format!("{}\n{}, {}", &user, &date, &time);
+        };
+    }
 
-            out.send(message)
-        }
-    }).unwrap();
-
+        
     // ------------------------------
     // SQL CONNECTION TO SQL DATABASE
     // ------------------------------
-
-
-
-    let mut test_data = HashMap::new();
-
-    // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
-    test_data.insert(args.name, vec!(date, time));
-
-    for (users, data) in &test_data {
-        conn.execute(
-            "INSERT INTO users (name) values (?1)",
-            &[&users.to_string()],
-        )?;
-
-        let last_id: String = conn.last_insert_rowid().to_string();
-
-        conn.execute(
-            "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
-            &[&data[0].to_string(), &data[1].to_string(), &last_id],
-        )?;
-
-    };
 
 
     // cat_colors.insert(String::from("Blue"), vec!["Tigger", "Sammy"]);
@@ -179,10 +199,6 @@ fn main() -> Result<()> {
     //         )?;
     //     }
     // }
-
-    
-    
-
 
     Ok(())
 }
