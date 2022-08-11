@@ -1,4 +1,3 @@
-#[allow(unused_imports)]
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 use rusqlite::{Connection, Result};
@@ -18,6 +17,7 @@ use ws::{listen, Message};
 // [  ] -> Find out if the CLI - Action argument could be used for something, perhaps to run some test case.
 // [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 
+
 #[derive(Parser, Default, Debug)]
 struct Cli {
     #[clap(short, long)]
@@ -31,7 +31,6 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-
     let args = Cli::parse();
 
     let name: String = match args.name {
@@ -50,8 +49,10 @@ fn main() -> Result<()> {
         println!("{:?}", &action);
     }
 
+    // Pointer to open database file
     let sqlconn: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::open("db.db")?));
 
+    // ip address to websocket listener, and to print to command line.
     let ip: String = "127.0.0.1:3012".to_string();
 
     // ------------------
@@ -97,6 +98,7 @@ fn main() -> Result<()> {
                 // ------------------------------
 
                 // rusqlite uses execute to run actual sql queries, is it safe?
+                // Tried to do a simple drop table - sql inject, which did nothing.
                 inconn.execute(
                     "create table if not exists users (
                         id integer primary key,
@@ -104,7 +106,6 @@ fn main() -> Result<()> {
                     )",
                     [],
                 ).unwrap();
-
 
                 inconn.execute(
                     "create table if not exists data (
@@ -136,12 +137,12 @@ fn main() -> Result<()> {
         }).unwrap();
 
     } else {
-        #[allow(unreachable_code)]
         let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
 
-        let conn:Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
-        let conn:MutexGuard<Connection> = conn.lock().unwrap();
+        let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
+        let conn: MutexGuard<Connection> = conn.lock().unwrap();
         
+        // Could be cached for batch insert in .db
         test_data.insert(name, vec!(date, time));
 
         for (users, data) in &test_data {
