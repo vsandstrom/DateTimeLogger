@@ -1,5 +1,0 @@
-returns the latest user:
-select name, date, time from data join users on data.user_id = users.id order by data.date desc, data.time desc limit 1;
-
-return name, date and time in database where latest entry is displayed first:
-select name, date, time from data join users on data.user_id = users.id order by data.date desc, data.time desc;
