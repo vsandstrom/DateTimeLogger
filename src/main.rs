@@ -1,11 +1,8 @@
 #[allow(unused_imports)]
 use std::collections::HashMap;
-use std::sync::mpsc::channel;
-// use std::time::Duration;
-
+use std::sync::{Arc, Mutex, MutexGuard};
 use rusqlite::{Connection, Result};
 use chrono::prelude::*;
-use std::sync::{Arc, Mutex};
 use clap::Parser;
 use ws::{listen, Message};
 
@@ -33,10 +30,6 @@ struct Cli {
     action: Option<String>,
 }
 
-// enum Signal {
-//     Greet,
-// }
-
 fn main() -> Result<()> {
 
     let args = Cli::parse();
@@ -57,7 +50,7 @@ fn main() -> Result<()> {
         println!("{:?}", &action);
     }
 
-    let sqlconn = Arc::new(Mutex::new(Connection::open("db.db")?));
+    let sqlconn: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::open("db.db")?));
 
     let ip: String = "127.0.0.1:3012".to_string();
 
@@ -83,15 +76,16 @@ fn main() -> Result<()> {
         listen(ip, |out| {
 
             // Pass a reference to the opened database file into websocket closure.
-            let _inconn = Arc::clone(&sqlconn);
+            let _inconn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
 
             move |msg: Message| {
-                // thread::sleep(Duration::from_secs(2));
+
                 let dt: DateTime<Local> = Local::now();
                 let date: String = dt.format("%Y-%m-%d").to_string();
                 let time: String = dt.format("%H:%M:%S").to_string();
 
-                let inconn = _inconn.lock().unwrap();
+                // should use .try_lock() and handle the Result tuple. quick n dirty...
+                let inconn: MutexGuard<Connection> = _inconn.lock().unwrap();
 
                 //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
                 //--- new user
@@ -143,13 +137,11 @@ fn main() -> Result<()> {
 
     } else {
         #[allow(unreachable_code)]
-        let mut test_data = HashMap::new();
+        let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
 
-        // should use .try_lock() and handle the Result tuple. quick n dirty...
-        let conn = Arc::clone(&sqlconn);
-        let conn = conn.lock().unwrap();
+        let conn:Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
+        let conn:MutexGuard<Connection> = conn.lock().unwrap();
         
-        // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
         test_data.insert(name, vec!(date, time));
 
         for (users, data) in &test_data {
@@ -164,14 +156,7 @@ fn main() -> Result<()> {
                 "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
                 &[&data[0].to_string(), &data[1].to_string(), &last_id],
             )?;
-
         };
-
     }
-
-        
-
-
-
     Ok(())
 }
