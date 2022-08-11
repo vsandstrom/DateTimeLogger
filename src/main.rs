@@ -7,28 +7,24 @@ use rusqlite::{Connection, Result};
 use chrono::prelude::*;
 use std::sync::{Arc, Mutex};
 use clap::Parser;
-#[allow(unused)]
 use ws::{listen, Message};
-
-
-#[allow(unused_imports)]
-// use message_io::node::{self, NodeEvent};
-// use message_io::network::{NetEvent, Transport};
 
 
 // TODO: 
 // [ X ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
 //          new data input.
 // [ X ] -> Make a CLI parser for inputting a custom username under which to store associated data
-// [  ] -> Figure out if there is a need for shared ownership of the Connection object from
+// [ X ] -> Figure out how to use shared ownership of the Connection object from
 //          rusqlite to enter new data in the sqlite table at runtime.
 //          SQL table
+// [  ] -> Migrate to sqlx Rust library.
+// [  ] -> Find out if the CLI - Action argument could be used for something, perhaps to run some test case.
 // [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 
 #[derive(Parser, Default, Debug)]
 struct Cli {
     #[clap(short, long)]
-    // #[clap(default_value_t=String::from("Viktor Sandström"))]
+    // #[clap(default_value_t=String::from("Ville Vässla"))]
     /// Name of user 
     name: Option<String>,
     // #[clap(default_value_t=None)]
@@ -47,7 +43,8 @@ fn main() -> Result<()> {
 
     let name: String = match args.name {
         Some(name) => name,
-        None => "".to_string(), // "Viktor Sandström".to_string(),
+        // not that clean error handling
+        None => "".to_string(), 
     };
 
     let action: String = match args.action {
@@ -58,11 +55,9 @@ fn main() -> Result<()> {
     if name.len() != 0 {
         println!("{:?}", &name);
         println!("{:?}", &action);
-
     }
 
-
-    let sqlconn = Arc::new(Mutex::new(Connection::open("medicine.db")?));
+    let sqlconn = Arc::new(Mutex::new(Connection::open("db.db")?));
 
     let ip: String = "127.0.0.1:3012".to_string();
 
@@ -75,7 +70,6 @@ fn main() -> Result<()> {
     let date: String = dt.format("%Y-%m-%d").to_string();
     let time: String = dt.format("%H:%M:%S").to_string();
 
-
     println!("{}\n{}\n", date, time);
 
     // ------------------------------------------
@@ -84,31 +78,18 @@ fn main() -> Result<()> {
     
     println!("IP: {ip}");
 
-    //let conn = Connection::open("medicine.db")?;
-
-    // http::Response();
-    
     if name.len() == 0 {
 
         listen(ip, |out| {
-            // use a new thread here to use conn to sql as Arc::new(Mutex::new);
 
-            // Seems unnecesary to use Arc locks to give access to the connection to the sql. 
-            // how shold this be handled?
+            // Pass a reference to the opened database file into websocket closure.
             let _inconn = Arc::clone(&sqlconn);
 
-            // let mut test_data = HashMap::new();
-            // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
-            
             move |msg: Message| {
-                println!("{}", msg);
                 // thread::sleep(Duration::from_secs(2));
                 let dt: DateTime<Local> = Local::now();
                 let date: String = dt.format("%Y-%m-%d").to_string();
                 let time: String = dt.format("%H:%M:%S").to_string();
-
-                // rusqlite uses execute to run actual sql queries
-                // let conn = Connection::open("medicine.db").unwrap();
 
                 let inconn = _inconn.lock().unwrap();
 
@@ -117,7 +98,11 @@ fn main() -> Result<()> {
                 // let mut stmt = conn.prepare("select user from users where user = :user").unwrap();
                 // let res = stmt.query([msg.to_string()]).unwrap();
                 
+                // ------------------------------
+                // SQL CONNECTION TO SQL DATABASE
+                // ------------------------------
 
+                // rusqlite uses execute to run actual sql queries, is it safe?
                 inconn.execute(
                     "create table if not exists users (
                         id integer primary key,
@@ -151,6 +136,7 @@ fn main() -> Result<()> {
 
                 let message: String = format!("{}\n{}, {}", msg.to_string(), &date, &time);
 
+                println!("{}", &message);
                 out.send(message)
             }
         }).unwrap();
@@ -184,28 +170,8 @@ fn main() -> Result<()> {
     }
 
         
-    // ------------------------------
-    // SQL CONNECTION TO SQL DATABASE
-    // ------------------------------
 
 
-    // cat_colors.insert(String::from("Blue"), vec!["Tigger", "Sammy"]);
-
-    // cat_colors.insert(String::from("Black"), vec!["Oreo", "Biscuit"]);
-
-    // for (color, catnames) in &cat_colors {
-    //     conn.execute(
-    //         "INSERT INTO cat_colors (name) values (?1)",
-    //         &[&color.to_string()],
-    //     )?;
-    //     let last_id: String = conn.last_insert_rowid().to_string();
-    //     for cat in catnames {
-    //         conn.execute(
-    //             "INSERT INTO cats (name, color_id) values (?1, ?2)",
-    //             &[&cat.to_string(), &last_id],
-    //         )?;
-    //     }
-    // }
 
     Ok(())
 }
