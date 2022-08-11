@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::collections::HashMap;
+use std::sync::mpsc::channel;
 // use std::time::Duration;
 
 use rusqlite::{Connection, Result};
@@ -83,7 +84,7 @@ fn main() -> Result<()> {
     
     println!("IP: {ip}");
 
-    let conn = Connection::open("medicine.db")?;
+    //let conn = Connection::open("medicine.db")?;
 
     // http::Response();
     
@@ -91,7 +92,6 @@ fn main() -> Result<()> {
 
         listen(ip, |out| {
             // use a new thread here to use conn to sql as Arc::new(Mutex::new);
-            let user: &str = &name;
 
             // Seems unnecesary to use Arc locks to give access to the connection to the sql. 
             // how shold this be handled?
@@ -108,7 +108,9 @@ fn main() -> Result<()> {
                 let time: String = dt.format("%H:%M:%S").to_string();
 
                 // rusqlite uses execute to run actual sql queries
-                let conn = Connection::open("medicine.db").unwrap();
+                // let conn = Connection::open("medicine.db").unwrap();
+
+                let inconn = _inconn.lock().unwrap();
 
                 //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
                 //--- new user
@@ -116,7 +118,7 @@ fn main() -> Result<()> {
                 // let res = stmt.query([msg.to_string()]).unwrap();
                 
 
-                conn.execute(
+                inconn.execute(
                     "create table if not exists users (
                         id integer primary key,
                         name text not null
@@ -125,7 +127,7 @@ fn main() -> Result<()> {
                 ).unwrap();
 
 
-                conn.execute(
+                inconn.execute(
                     "create table if not exists data (
                         id integer primary key,
                         date text not null,
@@ -135,14 +137,14 @@ fn main() -> Result<()> {
                     [],
                 ).unwrap();
 
-                conn.execute(
+                inconn.execute(
                     "INSERT INTO users (name) values (?1)",
                     [msg.to_string()]
                 ).unwrap();
 
-                let last_id: String = conn.last_insert_rowid().to_string();
+                let last_id: String = inconn.last_insert_rowid().to_string();
 
-                conn.execute(
+                inconn.execute(
                     "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
                     [&date, &time, &last_id]
                 ).unwrap();
@@ -157,6 +159,10 @@ fn main() -> Result<()> {
         #[allow(unreachable_code)]
         let mut test_data = HashMap::new();
 
+        // should use .try_lock() and handle the Result tuple. quick n dirty...
+        let conn = Arc::clone(&sqlconn);
+        let conn = conn.lock().unwrap();
+        
         // test_data.insert(String::from("Viktor Sandström"), vec!(date, time));
         test_data.insert(name, vec!(date, time));
 
@@ -174,6 +180,7 @@ fn main() -> Result<()> {
             )?;
 
         };
+
     }
 
         
