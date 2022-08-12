@@ -5,6 +5,8 @@ use chrono::prelude::*;
 use clap::Parser;
 use ws::{listen, Message};
 
+#[allow(non_snake_case)]
+
 
 // TODO: 
 // [ X ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
@@ -16,44 +18,45 @@ use ws::{listen, Message};
 // [  ] -> Migrate to sqlx Rust library.
 // [  ] -> Find out if the CLI - Action argument could be used for something, perhaps to run some test case.
 // [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
+// [  ] -> Try building a chat function around the database and websocket for CLI
 
 
 #[derive(Parser, Default, Debug)]
 struct Cli {
     #[clap(short, long)]
-    // #[clap(default_value_t=String::from("Ville Vässla"))]
+    // #[clap(default_value_t=String::from("Default Defaultsson"))]
     /// Name of user 
     name: Option<String>,
-    // #[clap(default_value_t=None)]
     #[clap(short, long)]
-    /// Action to take with runtime input
-    action: Option<String>,
+    #[clap(default_value_t=String::from("127.0.0.1"))]
+    /// IP adress for websocket to attach to
+    ip: String,
+    #[clap(short, long)]
+    #[clap(default_value_t=String::from("6666"))]
+    /// Port for websocket to listen to
+    port: String,
+    #[clap(short, long, takes_value=false)]
+    #[clap()]
+    /// Determines local or remote data input
+    websocket: bool,
+}
+
+fn populate_arg_variables(arg: Option<String>) -> String {
+    let a = match arg {
+        Some(arg) => arg,
+        None => panic!("Unvalid arguments as <name>")
+    };
+
+    return a;
 }
 
 fn main() -> Result<()> {
     let args = Cli::parse();
 
-    let name: String = match args.name {
-        Some(name) => name,
-        // not that clean error handling
-        None => "".to_string(), 
-    };
-
-    let action: String = match args.action {
-        Some(action) => action,
-        None => Default::default(), 
-    };
-
-    if name.len() != 0 {
-        println!("{:?}", &name);
-        println!("{:?}", &action);
-    }
+    let name = populate_arg_variables(args.name);
 
     // Pointer to open database file
     let sqlconn: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::open("db.db")?));
-
-    // ip address to websocket listener, and to print to command line.
-    let ip: String = "127.0.0.1:3012".to_string();
 
     // ------------------
     // FORMATTED DATETIME
@@ -69,12 +72,13 @@ fn main() -> Result<()> {
     // ------------------------------------------
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
     // ------------------------------------------
-    
-    println!("IP: {ip}");
 
-    if name.len() == 0 {
+    if args.websocket == true {
+        // ip address to websocket listener, and to print to command line.
+        let ip = format!("{}:{}", &args.ip, &args.port);
+        println!("IP: {}", &ip);
 
-        listen(ip, |out| {
+        let listener = listen(ip, |out| {
 
             // Pass a reference to the opened database file into websocket closure.
             let _inconn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
@@ -134,9 +138,14 @@ fn main() -> Result<()> {
                 println!("{}", &message);
                 out.send(message)
             }
-        }).unwrap();
+        });
 
-    } else {
+        let _listener = match listener {
+            Ok(handle) => handle,
+            Err(_) => panic!("Could not connect to IP:port"),
+        };
+
+    } else if args.websocket == false {
         let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
 
         let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
