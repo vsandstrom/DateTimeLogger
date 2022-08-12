@@ -63,11 +63,36 @@ fn main() -> Result<()> {
     // ------------------
     
 
-    let dt: DateTime<Local> = Local::now();
-    let date: String = dt.format("%Y-%m-%d").to_string();
-    let time: String = dt.format("%H:%M:%S").to_string();
 
-    println!("{}\n{}\n", date, time);
+
+
+
+    // rusqlite uses execute to run actual sql queries, is it safe?
+    // Tried to do a simple drop table - sql inject, which did nothing.
+
+    let conn = Arc::clone(&sqlconn);
+    let conn = conn.lock().unwrap();
+
+    // Create database if it does not exist
+    conn.execute(
+        "create table if not exists users (
+            id integer primary key,
+            name text not null
+        )",
+        [],
+    ).unwrap();
+
+    conn.execute(
+        "create table if not exists data (
+            id integer primary key,
+            date text not null,
+            time text not null,
+            user_id integer not null references users(id)
+        )",
+        [],
+    ).unwrap();
+
+    drop(conn);
 
     // ------------------------------------------
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
@@ -75,8 +100,9 @@ fn main() -> Result<()> {
 
     if args.websocket == true {
         // ip address to websocket listener, and to print to command line.
+        let status = "Websocket run:";
         let ip = format!("{}:{}", &args.ip, &args.port);
-        println!("IP: {}", &ip);
+        println!("{}\n\nIP: {}", status, &ip);
 
         let listener = listen(ip, |out| {
 
@@ -101,25 +127,6 @@ fn main() -> Result<()> {
                 // SQL CONNECTION TO SQL DATABASE
                 // ------------------------------
 
-                // rusqlite uses execute to run actual sql queries, is it safe?
-                // Tried to do a simple drop table - sql inject, which did nothing.
-                inconn.execute(
-                    "create table if not exists users (
-                        id integer primary key,
-                        name text not null
-                    )",
-                    [],
-                ).unwrap();
-
-                inconn.execute(
-                    "create table if not exists data (
-                        id integer primary key,
-                        date text not null,
-                        time text not null,
-                        user_id integer not null references users(id)
-                    )",
-                    [],
-                ).unwrap();
 
                 inconn.execute(
                     "INSERT INTO users (name) values (?1)",
@@ -151,6 +158,14 @@ fn main() -> Result<()> {
         let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
         let conn: MutexGuard<Connection> = conn.lock().unwrap();
         
+        let status = "Local run:";
+        let dt: DateTime<Local> = Local::now();
+        let date: String = dt.format("%Y-%m-%d").to_string();
+        let time: String = dt.format("%H:%M:%S").to_string();
+
+        let message: String = format!("{}\n\n{}\n{}, {}", status, name, date, time);
+
+        println!("{}", &message);
         // Could be cached for batch insert in .db
         test_data.insert(name, vec!(date, time));
 
