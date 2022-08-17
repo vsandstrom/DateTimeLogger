@@ -18,8 +18,8 @@ The optional [-w] -flag is a boolean and is used to set the program to listen to
 
 If the [-w] -flag is not set, the [-i and -p] arguments are unneccesary and thrown away. 
 
-Run 
+To get a flashy usage message run:
+
 ```bash
 cargo run -- -h
 ```
-to get a flashy usage message
