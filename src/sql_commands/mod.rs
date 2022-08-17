@@ -13,15 +13,18 @@ pub fn get_user_entries(conn: &Connection, user: &str) -> Vec<String> {
 }
 
 pub fn create_db(conn: &Connection) {
-    conn.execute(
+    match conn.execute(
         "create table if not exists users (
             id integer primary key,
             name text not null
         )",
         [],
-    ).unwrap();
+    ) {
+        Ok(_) => (), 
+        Err(err) => println!("Failed to create 'users'-table. {}", err)
+    }
 
-    conn.execute(
+    match conn.execute(
         "create table if not exists data (
             id integer primary key,
             date text not null,
@@ -29,19 +32,28 @@ pub fn create_db(conn: &Connection) {
             user_id integer not null references users(id)
         )",
         [],
-    ).unwrap();
+    ) {
+        Ok(_) => (),
+        Err(err) => println!("Failed to create 'data'-table. {}", err)
+    };
 }
 
 pub fn insert_data(conn: &Connection, user: &str, date: &str, time: &str) {
-    conn.execute(
+    match conn.execute(
         "INSERT INTO users (name) values (?1)",
         [user]
-    ).unwrap();
+    ) {
+        Ok(size) => println!("Rows added in 'users'-table: {}", size),
+        Err(err) => println!("Failed to update rows: {}", err)
+    };
 
     let last_id: String = conn.last_insert_rowid().to_string();
 
-    conn.execute(
+    match conn.execute(
         "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
         [date, time, &last_id]
-    ).unwrap();
+    ) {
+        Ok(size) => println!("Rows added in 'data'-table: {}", size),
+        Err(err) => println!("Failed to update rows: {}", err)
+    }
 }

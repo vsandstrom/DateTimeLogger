@@ -43,13 +43,11 @@ fn main() -> Result<()> {
     // FORMATTED DATETIME
     // ------------------
     
-    // rusqlite uses execute to run actual sql queries, is it safe?
-    // Tried to do a simple drop table - sql inject, which did nothing.
-
     let conn = Arc::clone(&sqlconn);
     let conn = conn.lock().unwrap();
 
     // Create database if it does not exist
+
     create_db(&conn);
     drop(conn);
 
