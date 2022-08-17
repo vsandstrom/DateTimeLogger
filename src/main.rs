@@ -1,3 +1,12 @@
+mod validate;
+mod sql_commands;
+mod parser;
+
+use crate::validate::{NameOrBool, validate_user};
+use crate::parser::{Cli, populate_arg_variables};
+#[allow(unused_imports)]
+use crate::sql_commands::get_user_entries;
+
 use core::panic;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -5,10 +14,7 @@ use rusqlite::{Connection, Result};
 use chrono::prelude::*;
 use clap::Parser;
 use ws::{listen, Message};
-use regex::Regex;
-
 #[allow(non_snake_case)]
-
 
 // TODO: 
 // [ X ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
@@ -16,104 +22,18 @@ use regex::Regex;
 // [ X ] -> Make a CLI parser for inputting a custom username under which to store associated data
 // [ X ] -> Figure out how to use shared ownership of the Connection object from
 //          rusqlite to enter new data in the sqlite table at runtime.
-//          SQL table
+//          SQL tablea
+// [ X ] -> Divide struct and functions into submodules
 // [  ] -> Migrate to sqlx Rust library.
 // [  ] -> Find out if the CLI - Action argument could be used for something, perhaps to run some test case.
 // [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 // [  ] -> Try building a chat function around the database and websocket for CLI
 // [  ] -> Hashing function to handle multiple users with same name.
 
-
-
-#[derive(Parser, Default, Debug)]
-struct Cli {
-    #[clap(short, long)]
-    // #[clap(default_value_t=String::from("Default Defaultsson"))]
-    /// Name of user 
-    name: Option<String>,
-    #[clap(short, long)]
-    #[clap(default_value_t=String::from("127.0.0.1"))]
-    /// IP adress for websocket to attach to
-    ip: String,
-    #[clap(short, long)]
-    #[clap(default_value_t=String::from("6666"))]
-    /// Port for websocket to listen to
-    port: String,
-    #[clap(short, long, takes_value=false)]
-    #[clap()]
-    /// Determines local or remote data input
-    websocket: bool,
-}
-
-struct NameOrBool {
-    name: String,
-    bool: bool
-}
-
-fn populate_arg_variables(arg: Option<String>) -> NameOrBool {
-    let a: NameOrBool = match arg {
-        Some(arg) => {
-            let temp = NameOrBool{
-                name: arg,
-                bool: true
-            };
-            temp
-        },
-            // NameOrBool::name = String::from(arg)},
-        None => {
-            let temp = NameOrBool {
-                name: String::from(""),
-                bool: false
-            };
-            temp
-        }
-    };
-    return a;
-}
-
-#[allow(dead_code)]
-fn get_user_entries(conn: &Connection, user: &str) -> Vec<String> {
-    let mut stmt = conn.prepare("SELECT * from users WHERE name = ?").unwrap();
-    let rows = stmt.query_map([user], |row| row.get(0)).unwrap();   
-
-    let mut names: Vec<String> = Vec::new();
-    for row in rows {
-        names.push(row.unwrap());
-    }
-    names
-
-}
-
-#[allow(dead_code)]
-fn validate_user(conn: &Connection, user: &str) -> bool {
-    // Need user id hash to id which user if multiple with same name exist.
-    // Use Regex to identify if user has a probable name.
-    let re = Regex::new(r"[a-öA-Ö]\s[a-öA-Ö]").unwrap();
-    assert!(re.is_match(user));
-
-    // if user already exist in db, then it is valid to enter more data
-    let mut stmt = conn.prepare("SELECT * from users WHERE name = ?").unwrap();
-    // let rows = &stmt.query(rusqlite::params![user]);
-    // let _rows = match rows {
-    //     Ok(_) => true,
-    //     Err(_) => false,
-    // };
-    let rows = stmt.query_map([user], |row| row.get(1)).unwrap();   
-
-    let mut names: Vec<String> = Vec::new();
-    for row in rows {
-        names.push(row.unwrap());
-    }
-    if names.len() > 0{
-        return true;
-    } 
-    false
-}
-
 fn main() -> Result<()> {
     let args = Cli::parse();
 
-    let name = populate_arg_variables(args.name);
+    let cli_name_or_bool: NameOrBool = populate_arg_variables(args.name);
 
     // Pointer to open database file
     let sqlconn: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::open("db.db")?));
@@ -153,7 +73,7 @@ fn main() -> Result<()> {
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
     // ------------------------------------------
 
-    if args.websocket == true && name.bool == false {
+    if args.websocket == true && cli_name_or_bool.bool() == false {
         // ip address to websocket listener, and to print to command line.
         let status = "Websocket run:";
         let ip = format!("{}:{}", &args.ip, &args.port);
@@ -179,6 +99,7 @@ fn main() -> Result<()> {
                 // If not in db:
                 if !valid {
                     let faulty_input = "Faulty input - User do not exist";
+                    println!("{}", faulty_input);
                     out.send(faulty_input)
                 } else {
 
@@ -203,7 +124,6 @@ fn main() -> Result<()> {
                     println!("{}", &message);
                     out.send(message)
                 }
-
             }
         });
 
@@ -221,12 +141,13 @@ fn main() -> Result<()> {
         let dt: DateTime<Local> = Local::now();
         let date: String = dt.format("%Y-%m-%d").to_string();
         let time: String = dt.format("%H:%M:%S").to_string();
+        let name = String::from(cli_name_or_bool.name());
 
-        let message: String = format!("{}\n\n{}\n{}, {}", status, name.name, date, time);
+        let message: String = format!("{}\n\n{}\n{}, {}", status, name, date, time);
 
         println!("{}", &message);
         // Could be cached for batch insert in .db
-        test_data.insert(name.name, vec!(date, time));
+        test_data.insert(name, vec!(date, time));
 
         let conn: MutexGuard<Connection> = conn.lock().unwrap();
         for (users, data) in &test_data {
