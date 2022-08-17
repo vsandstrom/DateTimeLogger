@@ -176,8 +176,8 @@ fn main() -> Result<()> {
                 let valid = validate_user(&inconn, &msg.to_string());
 
                 if !valid {
+                    // Could be made to fail silently, with a faulty imput message
                     panic!("Not a valid username, username has not been used before");
-                    
                 }
 
                 //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
@@ -188,7 +188,6 @@ fn main() -> Result<()> {
                 // ------------------------------
                 // SQL CONNECTION TO SQL DATABASE
                 // ------------------------------
-
 
                 inconn.execute(
                     "INSERT INTO users (name) values (?1)",
