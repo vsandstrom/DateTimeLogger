@@ -1,9 +1,11 @@
+use core::panic;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 use rusqlite::{Connection, Result};
 use chrono::prelude::*;
 use clap::Parser;
 use ws::{listen, Message};
+use regex::Regex;
 
 #[allow(non_snake_case)]
 
@@ -19,6 +21,8 @@ use ws::{listen, Message};
 // [  ] -> Find out if the CLI - Action argument could be used for something, perhaps to run some test case.
 // [  ] -> Work on front-end doing api calls to do new DateTime events into sql database
 // [  ] -> Try building a chat function around the database and websocket for CLI
+// [  ] -> Hashing function to handle multiple users with same name.
+
 
 
 #[derive(Parser, Default, Debug)]
@@ -41,13 +45,69 @@ struct Cli {
     websocket: bool,
 }
 
-fn populate_arg_variables(arg: Option<String>) -> String {
-    let a = match arg {
-        Some(arg) => arg,
-        None => panic!("Unvalid arguments as <name>")
-    };
+struct NameOrBool {
+    name: String,
+    bool: bool
+}
 
+fn populate_arg_variables(arg: Option<String>) -> NameOrBool {
+    let a: NameOrBool = match arg {
+        Some(arg) => {
+            let temp = NameOrBool{
+                name: arg,
+                bool: true
+            };
+            temp
+        },
+            // NameOrBool::name = String::from(arg)},
+        None => {
+            let temp = NameOrBool {
+                name: String::from(""),
+                bool: false
+            };
+            temp
+        }
+    };
     return a;
+}
+
+#[allow(dead_code)]
+fn get_user_entries(conn: &Connection, user: &str) -> Vec<String> {
+    let mut stmt = conn.prepare("SELECT * from users WHERE name = ?").unwrap();
+    let rows = stmt.query_map([user], |row| row.get(0)).unwrap();   
+
+    let mut names: Vec<String> = Vec::new();
+    for row in rows {
+        names.push(row.unwrap());
+    }
+    names
+
+}
+
+#[allow(dead_code)]
+fn validate_user(conn: &Connection, user: &str) -> bool {
+    // Need user id hash to id which user if multiple with same name exist.
+    // Use Regex to identify if user has a probable name.
+    let re = Regex::new(r"[a-öA-Ö]\s[a-öA-Ö]").unwrap();
+    assert!(re.is_match(user));
+
+    // if user already exist in db, then it is valid to enter more data
+    let mut stmt = conn.prepare("SELECT * from users WHERE name = ?").unwrap();
+    // let rows = &stmt.query(rusqlite::params![user]);
+    // let _rows = match rows {
+    //     Ok(_) => true,
+    //     Err(_) => false,
+    // };
+    let rows = stmt.query_map([user], |row| row.get(1)).unwrap();   
+
+    let mut names: Vec<String> = Vec::new();
+    for row in rows {
+        names.push(row.unwrap());
+    }
+    if names.len() > 0{
+        return true;
+    } 
+    false
 }
 
 fn main() -> Result<()> {
@@ -62,11 +122,6 @@ fn main() -> Result<()> {
     // FORMATTED DATETIME
     // ------------------
     
-
-
-
-
-
     // rusqlite uses execute to run actual sql queries, is it safe?
     // Tried to do a simple drop table - sql inject, which did nothing.
 
@@ -98,7 +153,7 @@ fn main() -> Result<()> {
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
     // ------------------------------------------
 
-    if args.websocket == true {
+    if args.websocket == true && name.bool == false {
         // ip address to websocket listener, and to print to command line.
         let status = "Websocket run:";
         let ip = format!("{}:{}", &args.ip, &args.port);
@@ -117,6 +172,13 @@ fn main() -> Result<()> {
 
                 // should use .try_lock() and handle the Result tuple. quick n dirty...
                 let inconn: MutexGuard<Connection> = _inconn.lock().unwrap();
+
+                let valid = validate_user(&inconn, &msg.to_string());
+
+                if !valid {
+                    panic!("Not a valid username, username has not been used before");
+                    
+                }
 
                 //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
                 //--- new user
@@ -156,19 +218,19 @@ fn main() -> Result<()> {
         let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
 
         let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
-        let conn: MutexGuard<Connection> = conn.lock().unwrap();
         
         let status = "Local run:";
         let dt: DateTime<Local> = Local::now();
         let date: String = dt.format("%Y-%m-%d").to_string();
         let time: String = dt.format("%H:%M:%S").to_string();
 
-        let message: String = format!("{}\n\n{}\n{}, {}", status, name, date, time);
+        let message: String = format!("{}\n\n{}\n{}, {}", status, name.name, date, time);
 
         println!("{}", &message);
         // Could be cached for batch insert in .db
-        test_data.insert(name, vec!(date, time));
+        test_data.insert(name.name, vec!(date, time));
 
+        let conn: MutexGuard<Connection> = conn.lock().unwrap();
         for (users, data) in &test_data {
             conn.execute(
                 "INSERT INTO users (name) values (?1)",
