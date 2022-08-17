@@ -177,34 +177,38 @@ fn main() -> Result<()> {
 
                 if !valid {
                     // Could be made to fail silently, with a faulty imput message
-                    panic!("Not a valid username, username has not been used before");
+                    let faulty_input = "Faulty input - User do not exist";
+                    out.send(faulty_input)
+                    // panic!("Not a valid username, username has not been used before");
+                } else {
+
+                    //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
+                    //--- new user
+                    // let mut stmt = conn.prepare("select user from users where user = :user").unwrap();
+                    // let res = stmt.query([msg.to_string()]).unwrap();
+                    
+                    // ------------------------------
+                    // SQL CONNECTION TO SQL DATABASE
+                    // ------------------------------
+
+                    inconn.execute(
+                        "INSERT INTO users (name) values (?1)",
+                        [msg.to_string()]
+                    ).unwrap();
+
+                    let last_id: String = inconn.last_insert_rowid().to_string();
+
+                    inconn.execute(
+                        "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
+                        [&date, &time, &last_id]
+                    ).unwrap();
+
+                    let message: String = format!("{}\n{}, {}", msg.to_string(), &date, &time);
+
+                    println!("{}", &message);
+                    out.send(message)
                 }
 
-                //--- TRY TO SEE IF USER ALREADY EXISTS IN DB, otherwise build logic to handle inputing
-                //--- new user
-                // let mut stmt = conn.prepare("select user from users where user = :user").unwrap();
-                // let res = stmt.query([msg.to_string()]).unwrap();
-                
-                // ------------------------------
-                // SQL CONNECTION TO SQL DATABASE
-                // ------------------------------
-
-                inconn.execute(
-                    "INSERT INTO users (name) values (?1)",
-                    [msg.to_string()]
-                ).unwrap();
-
-                let last_id: String = inconn.last_insert_rowid().to_string();
-
-                inconn.execute(
-                    "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
-                    [&date, &time, &last_id]
-                ).unwrap();
-
-                let message: String = format!("{}\n{}, {}", msg.to_string(), &date, &time);
-
-                println!("{}", &message);
-                out.send(message)
             }
         });
 
