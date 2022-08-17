@@ -55,7 +55,8 @@ fn main() -> Result<()> {
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
     // ------------------------------------------
 
-    if args.websocket == true && cli_name_or_bool.bool() == false {
+    // if websocket is true and no username has been given at command line:
+    if args.websocket == true && !cli_name_or_bool.bool() {
         // ip address to websocket listener, and to print to command line.
         let status = "Websocket run:";
         let ip = format!("{}:{}", &args.ip, &args.port);
@@ -105,7 +106,8 @@ fn main() -> Result<()> {
             Err(_) => panic!("Could not connect to IP:port"),
         };
 
-    } else if args.websocket == false {
+    // else if websocket is off and there is a username from commandline:
+    } else if args.websocket == false && cli_name_or_bool.bool(){
         
         let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
         
@@ -118,9 +120,11 @@ fn main() -> Result<()> {
         let message: String = format!("{}\n\n{}\n{}, {}", status, name, date, time);
 
         println!("{}", &message);
-        // Could be cached for batch insert in .db
-        // let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
-        // test_data.insert(name, vec!(date, time));
+        /*
+        Could be cached for batch insert in .db
+        let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
+        test_data.insert(name, vec!(date, time));
+        */
 
         let conn: MutexGuard<Connection> = conn.lock().unwrap();
         insert_data(&conn, &name, &date, &time);
