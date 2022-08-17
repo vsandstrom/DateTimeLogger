@@ -9,7 +9,7 @@ To run:
 cargo run -- -n <user> [-i <ip-address> -p <port>] [-w] 
 ```
 
-On first run, add a user in local mode. The websocket will reject and panic! any user not already in the database.
+On first run, add a user in local mode. The program will reject any attempt to enter a username not already added into database from a local machine.
 
 
 The <user> argument contains the name that is to be entered in the database.
