@@ -5,10 +5,9 @@ mod parser;
 use crate::validate::{NameOrBool, validate_user};
 use crate::parser::{Cli, populate_arg_variables};
 #[allow(unused_imports)]
-use crate::sql_commands::get_user_entries;
+use crate::sql_commands::{create_db, insert_data};
 
 use core::panic;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 use rusqlite::{Connection, Result};
 use chrono::prelude::*;
@@ -31,8 +30,10 @@ use ws::{listen, Message};
 // [  ] -> Hashing function to handle multiple users with same name.
 
 fn main() -> Result<()> {
+    // Parse Argv into Cli struct
     let args = Cli::parse();
 
+    // Hacky solution for handling when there is no username from CLI during websocket run.
     let cli_name_or_bool: NameOrBool = populate_arg_variables(args.name);
 
     // Pointer to open database file
@@ -49,24 +50,7 @@ fn main() -> Result<()> {
     let conn = conn.lock().unwrap();
 
     // Create database if it does not exist
-    conn.execute(
-        "create table if not exists users (
-            id integer primary key,
-            name text not null
-        )",
-        [],
-    ).unwrap();
-
-    conn.execute(
-        "create table if not exists data (
-            id integer primary key,
-            date text not null,
-            time text not null,
-            user_id integer not null references users(id)
-        )",
-        [],
-    ).unwrap();
-
+    create_db(&conn);
     drop(conn);
 
     // ------------------------------------------
@@ -89,17 +73,19 @@ fn main() -> Result<()> {
                 let dt: DateTime<Local> = Local::now();
                 let date: String = dt.format("%Y-%m-%d").to_string();
                 let time: String = dt.format("%H:%M:%S").to_string();
+                let user: String = msg.to_string();
 
                 // should use .try_lock() and handle the Result tuple. quick n dirty...
                 let inconn: MutexGuard<Connection> = _inconn.lock().unwrap();
 
+                
                 // See if user is registered
-                let valid = validate_user(&inconn, &msg.to_string());
+                let valid = validate_user(&inconn, &user);
 
                 // If not in db:
                 if !valid {
                     let faulty_input = "Faulty input - User do not exist";
-                    println!("{}", faulty_input);
+                    println!("{}: {}", faulty_input, &user);
                     out.send(faulty_input)
                 } else {
 
@@ -107,19 +93,8 @@ fn main() -> Result<()> {
                     // SQL CONNECTION TO SQL DATABASE
                     // ------------------------------
 
-                    inconn.execute(
-                        "INSERT INTO users (name) values (?1)",
-                        [msg.to_string()]
-                    ).unwrap();
-
-                    let last_id: String = inconn.last_insert_rowid().to_string();
-
-                    inconn.execute(
-                        "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
-                        [&date, &time, &last_id]
-                    ).unwrap();
-
-                    let message: String = format!("{}\n{}, {}", msg.to_string(), &date, &time);
+                    insert_data(&inconn, &user, &date, &time);
+                    let message: String = format!("{}\n{}, {}", &user, &date, &time);
 
                     println!("{}", &message);
                     out.send(message)
@@ -133,8 +108,7 @@ fn main() -> Result<()> {
         };
 
     } else if args.websocket == false {
-        let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
-
+        
         let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
         
         let status = "Local run:";
@@ -147,22 +121,11 @@ fn main() -> Result<()> {
 
         println!("{}", &message);
         // Could be cached for batch insert in .db
-        test_data.insert(name, vec!(date, time));
+        // let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
+        // test_data.insert(name, vec!(date, time));
 
         let conn: MutexGuard<Connection> = conn.lock().unwrap();
-        for (users, data) in &test_data {
-            conn.execute(
-                "INSERT INTO users (name) values (?1)",
-                &[&users.to_string()],
-            )?;
-
-            let last_id: String = conn.last_insert_rowid().to_string();
-
-            conn.execute(
-                "INSERT INTO data (date, time, user_id) values (?1, ?2, ?3)",
-                &[&data[0].to_string(), &data[1].to_string(), &last_id],
-            )?;
-        };
+        insert_data(&conn, &name, &date, &time);
     }
     Ok(())
 }
