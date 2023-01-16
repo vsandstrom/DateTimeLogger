@@ -1,19 +1,20 @@
+
+#![allow(non_snake_case)]
+
 mod validate;
 mod sql_commands;
 mod parser;
+mod actions;
 
-use crate::validate::{NameOrBool, validate_user};
 use crate::parser::{Cli, populate_arg_variables};
+use crate::validate::NameOrBool;
+use crate::sql_commands::create_db;
 #[allow(unused_imports)]
-use crate::sql_commands::{create_db, insert_data};
+use crate::actions::{websocket_run, local_run, http_run};
 
-use core::panic;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use rusqlite::{Connection, Result};
-use chrono::prelude::*;
 use clap::Parser;
-use ws::{listen, Message};
-#[allow(non_snake_case)]
 
 // TODO: 
 // [ X ] -> Make sql calls be able to check if user already exists, and if so, use that users ID for
@@ -32,24 +33,20 @@ use ws::{listen, Message};
 fn main() -> Result<()> {
     // Parse Argv into Cli struct
     let args = Cli::parse();
-
     // Hacky solution for handling when there is no username from CLI during websocket run.
     let cli_name_or_bool: NameOrBool = populate_arg_variables(args.name);
 
     // Pointer to open database file
-    let sqlconn: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::open("db.db")?));
-
-    // ------------------
-    // FORMATTED DATETIME
-    // ------------------
-    
-    let conn = Arc::clone(&sqlconn);
-    let conn = conn.lock().unwrap();
+    let sqlconnection: Arc<Mutex<Connection>> = Arc::new(Mutex::new(Connection::open("db.db")?));
+    let connection = Arc::clone(&sqlconnection);
+    let connection = connection.lock().unwrap();
 
     // Create database if it does not exist
 
-    create_db(&conn);
-    drop(conn);
+    create_db(&connection);
+    drop(connection);
+
+    
 
     // ------------------------------------------
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP
@@ -62,72 +59,13 @@ fn main() -> Result<()> {
         let ip = format!("{}:{}", &args.ip, &args.port);
         println!("{}\n\nIP: {}", status, &ip);
 
-        let listener = listen(ip, |out| {
-
-            // Pass a reference to the opened database file into websocket closure.
-            let _inconn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
-
-            move |msg: Message| {
-
-                let dt: DateTime<Local> = Local::now();
-                let date: String = dt.format("%Y-%m-%d").to_string();
-                let time: String = dt.format("%H:%M:%S").to_string();
-                let user: String = msg.to_string();
-
-                // should use .try_lock() and handle the Result tuple. quick n dirty...
-                let inconn: MutexGuard<Connection> = _inconn.lock().unwrap();
-
-                
-                // See if user is registered
-                let valid = validate_user(&inconn, &user);
-
-                // If not in db:
-                if !valid {
-                    let faulty_input = "Faulty input - User do not exist";
-                    println!("{}: {}", faulty_input, &user);
-                    out.send(faulty_input)
-                } else {
-
-                    // ------------------------------
-                    // SQL CONNECTION TO SQL DATABASE
-                    // ------------------------------
-
-                    insert_data(&inconn, &user, &date, &time);
-                    let message: String = format!("{}\n{}, {}", &user, &date, &time);
-
-                    println!("{}", &message);
-                    out.send(message)
-                }
-            }
-        });
-
-        let _listener = match listener {
-            Ok(handle) => handle,
-            Err(_) => panic!("Could not connect to IP:port"),
-        };
+        websocket_run(&ip, Arc::clone(&sqlconnection));
 
     // else if websocket is off and there is a username from commandline:
     } else if args.websocket == false && cli_name_or_bool.bool(){
+
+        local_run(cli_name_or_bool.name(), Arc::clone(&sqlconnection));
         
-        let conn: Arc<Mutex<Connection>> = Arc::clone(&sqlconn);
-        
-        let status = "Local run:";
-        let dt: DateTime<Local> = Local::now();
-        let date: String = dt.format("%Y-%m-%d").to_string();
-        let time: String = dt.format("%H:%M:%S").to_string();
-        let name = String::from(cli_name_or_bool.name());
-
-        let message: String = format!("{}\n\n{}\n{}, {}", status, name, date, time);
-
-        println!("{}", &message);
-        /*
-        Could be cached for batch insert in .db
-        let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
-        test_data.insert(name, vec!(date, time));
-        */
-
-        let conn: MutexGuard<Connection> = conn.lock().unwrap();
-        insert_data(&conn, &name, &date, &time);
     }
     Ok(())
 }

@@ -1,5 +1,8 @@
+#![allow(non_snake_case)]
+
 use rusqlite::Connection;
 use regex::Regex;
+
 
 pub struct NameOrBool {
     name: String,
@@ -23,8 +26,16 @@ impl NameOrBool {
 pub fn validate_user(conn: &Connection, user: &str) -> bool {
     // Need user id hash to id which user if multiple with same name exist.
     // Use Regex to identify if user has a probable name.
-    let re = Regex::new(r"[a-öA-Ö]\s[a-öA-Ö]").unwrap();
-    assert!(re.is_match(user));
+    let re: Regex = Regex::new(r"[a-öA-Ö]\s[a-öA-Ö]").unwrap();
+    // let emptyStr: Regex = Regex::new(r"[\s]").unwrap();
+    if !re.is_match(user) && user == String::from(' ') {
+        println!("Not a valid input");
+        return false;
+    } 
+    // else if emptyStr.is_match(user) {
+    //     println!("No string sent");
+    //     return false;
+    // }
 
     // if user already exist in db, then it is valid to enter more data
     let mut stmt = conn.prepare("SELECT * from users WHERE name = ?").unwrap();
