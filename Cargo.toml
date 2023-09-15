@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 # message-io = { version = "0.14", default-features = false, features = ["websocket"] } 
-# http = "0.2"
 ws = "0.9.2"
 rusqlite = "0.27.0"
+
 # reqwest = { version = "0.11", features = ["json"] }
 chrono = "0.4"
 clap = { version = "3.1.6", features = ["derive"] }

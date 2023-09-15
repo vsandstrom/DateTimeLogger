@@ -1,2 +1,4 @@
 target/*
 *.db
+nohup.out
+sqlite-autoconf*

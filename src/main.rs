@@ -42,11 +42,8 @@ fn main() -> Result<()> {
     let connection = connection.lock().unwrap();
 
     // Create database if it does not exist
-
     create_db(&connection);
     drop(connection);
-
-    
 
     // ------------------------------------------
     // WEBSOCKET COMMUNICATING TO CLIENT-SIDE APP

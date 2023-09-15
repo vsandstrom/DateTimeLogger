@@ -26,7 +26,7 @@ pub fn local_run(user: &str, connection: Arc<Mutex<Connection>>){
     Could be cached for batch insert in .db
     let mut test_data: HashMap<String, Vec<String>> = HashMap::new();
     test_data.insert(name, vec!(date, time));
-    */
+ jj   */
 
     let inner_connection: MutexGuard<Connection> = inner_connection.lock().unwrap();
     insert_data(&inner_connection, &name, &date, &time);
@@ -49,7 +49,6 @@ pub fn websocket_run(ip: &str, connection: Arc<Mutex<Connection>>) {
             let time: String = dt.format("%H:%M:%S").to_string();
             let user: String = msg.to_string();
 
-            // should use .try_lock() and handle the Result tuple. quick n dirty...
             let inner_connection: MutexGuard<Connection> = inner_connection.lock().unwrap();
 
             

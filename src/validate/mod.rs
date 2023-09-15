@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-
 use rusqlite::Connection;
 use regex::Regex;
 
